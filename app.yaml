@@ -1,0 +1,53 @@
+name: moodle-api
+services:
+- name: api
+  source_dir: /
+  github:
+    repo: Dubjay18/moodle
+    branch: main
+  run_command: ./main
+  environment_slug: go
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  routes:
+  - path: /
+  envs:
+  - key: PORT
+    value: "8080"
+  - key: DATABASE_URL
+    type: secret
+    value: "${db.DATABASE_URL}"
+  - key: SUPABASE_JWKS_URL
+    type: secret
+    value: "https://your-project.supabase.co/auth/v1/keys"
+  - key: SUPABASE_JWT_ISSUER
+    type: secret
+    value: "https://your-project.supabase.co/auth/v1"
+  - key: SUPABASE_JWT_AUDIENCE
+    value: "authenticated"
+  - key: TMDB_API_KEY
+    type: secret
+    value: "your-tmdb-key"
+  - key: GEMINI_API_KEY
+    type: secret
+    value: "your-gemini-key"
+
+databases:
+- name: db
+  engine: PG
+  num_nodes: 1
+  size: db-s-1vcpu-1gb
+  version: "15"
+
+jobs:
+- name: migrate
+  source_dir: /
+  github:
+    repo: Dubjay18/moodle
+    branch: main
+  run_command: |
+    goose -dir ./migrations postgres "$DATABASE_URL" up
+  environment_slug: go
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  kind: PRE_DEPLOY

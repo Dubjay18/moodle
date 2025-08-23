@@ -1,0 +1,12 @@
+.env
+.env.local
+.env.prod
+bin/
+.git
+.gitignore
+README.md
+.idea/
+.vscode/
+*.log
+tmp/
+vendor/

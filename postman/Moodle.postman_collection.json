@@ -1,0 +1,161 @@
+{
+  "info": {
+    "name": "Moodle API",
+    "_postman_id": "11111111-2222-3333-4444-555555555555",
+    "description": "Postman collection for the Moodle backend: health, TMDb search/feed, AI, users, watchlists.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "token", "value": "", "type": "string" },
+    { "key": "ownerId", "value": "", "type": "string" }
+  ],
+  "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        { "name": "GET /healthz", "request": { "method": "GET", "auth": { "type": "noauth" }, "url": { "raw": "{{baseUrl}}/healthz", "host": ["{{baseUrl}}"], "path": ["healthz"] } } }
+      ]
+    },
+    {
+      "name": "Public",
+      "item": [
+        {
+          "name": "GET /v1/search/movies",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "noauth" },
+            "url": {
+              "raw": "{{baseUrl}}/v1/search/movies?q={{q}}&page={{page}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1","search","movies"],
+              "query": [
+                { "key": "q", "value": "Inception" },
+                { "key": "page", "value": "1" }
+              ]
+            },
+            "description": "TMDb movie search (q required)."
+          }
+        },
+        {
+          "name": "GET /v1/feed (trending)",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "noauth" },
+            "url": {
+              "raw": "{{baseUrl}}/v1/feed?type=trending&window=week&region=US&page=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1","feed"],
+              "query": [
+                { "key": "type", "value": "trending" },
+                { "key": "window", "value": "week" },
+                { "key": "region", "value": "US" },
+                { "key": "page", "value": "1" }
+              ]
+            },
+            "description": "Trending movies feed using TMDb (window=day|week)."
+          }
+        },
+        {
+          "name": "GET /v1/feed (discover)",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "noauth" },
+            "url": {
+              "raw": "{{baseUrl}}/v1/feed?type=discover&genre=878&sort_by=vote_average.desc&page=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1","feed"],
+              "query": [
+                { "key": "type", "value": "discover" },
+                { "key": "genre", "value": "878" },
+                { "key": "sort_by", "value": "vote_average.desc" },
+                { "key": "page", "value": "1" }
+              ]
+            },
+            "description": "Discover feed with filters (genre/year/region/sort_by)."
+          }
+        },
+        {
+          "name": "POST /v1/ai/ask",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [ {"key":"Content-Type","value":"application/json"} ],
+            "body": { "mode":"raw", "raw":"{\n  \"query\": \"Recommend underrated sci-fi movies from the 90s\"\n}" },
+            "url": { "raw":"{{baseUrl}}/v1/ai/ask", "host":["{{baseUrl}}"], "path":["v1","ai","ask"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "GET /v1/me",
+          "request": { "method": "GET", "url": { "raw":"{{baseUrl}}/v1/me", "host":["{{baseUrl}}"], "path":["v1","me"] } }
+        },
+        {
+          "name": "Watchlists",
+          "item": [
+            {
+              "name": "GET /v1/watchlists",
+              "request": { "method": "GET", "url": { "raw":"{{baseUrl}}/v1/watchlists?owner={{ownerId}}", "host":["{{baseUrl}}"], "path":["v1","watchlists"], "query":[{"key":"owner","value":"{{ownerId}}"}] } }
+            },
+            {
+              "name": "POST /v1/watchlists",
+              "request": {
+                "method": "POST",
+                "header": [{"key":"Content-Type","value":"application/json"}],
+                "body": {"mode":"raw","raw":"{\n  \"title\": \"My Watchlist\",\n  \"description\": \"Movies to watch\",\n  \"is_public\": true\n}"},
+                "url": {"raw":"{{baseUrl}}/v1/watchlists","host":["{{baseUrl}}"],"path":["v1","watchlists"]}
+              }
+            },
+            {
+              "name": "GET /v1/watchlists/:id",
+              "request": { "method": "GET", "url": { "raw":"{{baseUrl}}/v1/watchlists/:id", "host":["{{baseUrl}}"], "path":["v1","watchlists",":id"], "variable":[{"key":"id","value":""}] } }
+            },
+            {
+              "name": "PATCH /v1/watchlists/:id",
+              "request": {
+                "method": "PATCH",
+                "header": [{"key":"Content-Type","value":"application/json"}],
+                "body": {"mode":"raw","raw":"{\n  \"title\": \"Updated title\",\n  \"description\": \"Optional desc\",\n  \"is_public\": true\n}"},
+                "url": {"raw":"{{baseUrl}}/v1/watchlists/:id","host":["{{baseUrl}}"],"path":["v1","watchlists",":id"],"variable":[{"key":"id","value":""}]}
+              }
+            },
+            {
+              "name": "DELETE /v1/watchlists/:id",
+              "request": { "method": "DELETE", "url": { "raw":"{{baseUrl}}/v1/watchlists/:id", "host":["{{baseUrl}}"], "path":["v1","watchlists",":id"], "variable":[{"key":"id","value":""}] } }
+            },
+            {
+              "name": "POST /v1/watchlists/:id/items",
+              "request": {
+                "method": "POST",
+                "header": [{"key":"Content-Type","value":"application/json"}],
+                "body": {"mode":"raw","raw":"{\n  \"tmdb_id\": 603,\n  \"notes\": \"Rewatch soon\"\n}"},
+                "url": {"raw":"{{baseUrl}}/v1/watchlists/:id/items","host":["{{baseUrl}}"],"path":["v1","watchlists",":id","items"],"variable":[{"key":"id","value":""}]}
+              }
+            },
+            {
+              "name": "DELETE /v1/watchlists/:id/items/:itemId",
+              "request": { "method": "DELETE", "url": { "raw":"{{baseUrl}}/v1/watchlists/:id/items/:itemId", "host":["{{baseUrl}}"], "path":["v1","watchlists",":id","items",":itemId"], "variable":[{"key":"id","value":""},{"key":"itemId","value":""}] } }
+            },
+            {
+              "name": "POST /v1/watchlists/:id/like",
+              "request": { "method": "POST", "url": { "raw":"{{baseUrl}}/v1/watchlists/:id/like", "host":["{{baseUrl}}"], "path":["v1","watchlists",":id","like"], "variable":[{"key":"id","value":""}] } }
+            },
+            {
+              "name": "DELETE /v1/watchlists/:id/like",
+              "request": { "method": "DELETE", "url": { "raw":"{{baseUrl}}/v1/watchlists/:id/like", "host":["{{baseUrl}}"], "path":["v1","watchlists",":id","like"], "variable":[{"key":"id","value":""}] } }
+            }
+          ]
+        },
+        {
+          "name": "GET /v1/trending",
+          "request": { "method": "GET", "url": { "raw":"{{baseUrl}}/v1/trending?window=week&limit=20", "host":["{{baseUrl}}"], "path":["v1","trending"], "query":[{"key":"window","value":"week"},{"key":"limit","value":"20"}] } }
+        }
+      ]
+    }
+  ]
+}
