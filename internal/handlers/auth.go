@@ -40,9 +40,22 @@ func (h *AuthHandler) Routes(r chi.Router) {
 // GoogleLogin initiates Google OAuth flow via Supabase
 func (h *AuthHandler) googleLogin(w http.ResponseWriter, r *http.Request) {
 	redirectTo := r.URL.Query().Get("redirect_to")
+	fmt.Println("Raw redirect_to:", redirectTo)
+
+	// URL decode the redirect_to parameter
+	if redirectTo != "" {
+		decoded, err := url.QueryUnescape(redirectTo)
+		if err == nil {
+			redirectTo = decoded
+			fmt.Println("Decoded redirect_to:", redirectTo)
+		}
+	}
+
 	if redirectTo == "" {
 		redirectTo = h.ClientURL
 	}
+
+	fmt.Println("Final redirect_to:", redirectTo)
 
 	// Build Supabase OAuth URL
 	authURL := fmt.Sprintf("%s/auth/v1/authorize", h.SupabaseURL)
@@ -51,12 +64,22 @@ func (h *AuthHandler) googleLogin(w http.ResponseWriter, r *http.Request) {
 		"redirect_to": []string{redirectTo},
 	}
 
+	finalURL := authURL + "?" + params.Encode()
+	fmt.Println("Supabase OAuth URL:", finalURL)
+
 	// Redirect to Supabase Google OAuth
-	http.Redirect(w, r, authURL+"?"+params.Encode(), http.StatusTemporaryRedirect)
+	http.Redirect(w, r, finalURL, http.StatusTemporaryRedirect)
 }
 
 // AuthCallback handles the OAuth callback from Supabase
 func (h *AuthHandler) authCallback(w http.ResponseWriter, r *http.Request) {
+	// Check for redirect_to parameter from the original request
+	redirectTo := r.URL.Query().Get("redirect_to")
+	if redirectTo == "" {
+		redirectTo = h.ClientURL
+	}
+	fmt.Println("Callback redirect_to:", redirectTo)
+
 	// Extract tokens from URL fragments (Supabase returns them in the URL)
 	accessToken := r.URL.Query().Get("access_token")
 	refreshToken := r.URL.Query().Get("refresh_token")
@@ -82,18 +105,26 @@ const accessToken = params.get('access_token');
 const refreshToken = params.get('refresh_token');
 const error = params.get('error');
 
+// Also check for redirect_to in the URL
+const urlParams = new URLSearchParams(window.location.search);
+const redirectTo = urlParams.get('redirect_to') || '%s';
+
 if (error) {
     document.body.innerHTML = '<h1>Authentication Error</h1><p>' + error + '</p>';
 } else if (accessToken) {
     // Send tokens to backend
-    fetch('/auth/callback', {
+    fetch('/v1/auth/callback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ access_token: accessToken, refresh_token: refreshToken })
+        body: JSON.stringify({ 
+            access_token: accessToken, 
+            refresh_token: refreshToken,
+            redirect_to: redirectTo
+        })
     }).then(response => {
         if (response.ok) {
-            // Redirect to success page or close popup
-            window.location.href = '%s';
+            // Redirect to the original redirect_to URL
+            window.location.href = redirectTo;
         } else {
             document.body.innerHTML = '<h1>Error</h1><p>Failed to authenticate</p>';
         }
@@ -103,7 +134,7 @@ if (error) {
 }
 </script>
 </body>
-</html>`, h.ClientURL)
+</html>`, redirectTo)
 
 		w.Header().Set("Content-Type", "text/html")
 		w.WriteHeader(http.StatusOK)
@@ -116,6 +147,7 @@ if (error) {
 		var req struct {
 			AccessToken  string `json:"access_token"`
 			RefreshToken string `json:"refresh_token"`
+			RedirectTo   string `json:"redirect_to"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid request", http.StatusBadRequest)
@@ -123,6 +155,9 @@ if (error) {
 		}
 		accessToken = req.AccessToken
 		refreshToken = req.RefreshToken
+		if req.RedirectTo != "" {
+			redirectTo = req.RedirectTo
+		}
 	}
 
 	// Get user info from Supabase
@@ -166,7 +201,8 @@ if (error) {
 			"user":    user,
 		})
 	} else {
-		http.Redirect(w, r, h.ClientURL, http.StatusTemporaryRedirect)
+		fmt.Println("Final redirect to:", redirectTo)
+		http.Redirect(w, r, redirectTo, http.StatusTemporaryRedirect)
 	}
 }
 
