@@ -33,6 +33,7 @@ func NewAuthHandler(store *store.Store, supabaseURL, supabaseAnonKey, clientURL 
 func (h *AuthHandler) Routes(r chi.Router) {
 	r.Get("/google", h.googleLogin)
 	r.Get("/callback", h.authCallback)
+	r.Post("/callback", h.authCallbackPost)
 	r.Post("/logout", h.logout)
 	r.Get("/user", h.getUser)
 }
@@ -57,11 +58,17 @@ func (h *AuthHandler) googleLogin(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Final redirect_to:", redirectTo)
 
-	// Build Supabase OAuth URL
+	// Build callback URL with the original redirect_to as a parameter
+	callbackURL := fmt.Sprintf("%s/v1/auth/callback", getBaseURL(r))
+	if redirectTo != h.ClientURL {
+		callbackURL += "?redirect_to=" + url.QueryEscape(redirectTo)
+	}
+
+	// Build Supabase OAuth URL - redirect to OUR callback, not the final destination
 	authURL := fmt.Sprintf("%s/auth/v1/authorize", h.SupabaseURL)
 	params := url.Values{
 		"provider":    []string{"google"},
-		"redirect_to": []string{redirectTo},
+		"redirect_to": []string{callbackURL},
 	}
 
 	finalURL := authURL + "?" + params.Encode()
@@ -71,47 +78,51 @@ func (h *AuthHandler) googleLogin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, finalURL, http.StatusTemporaryRedirect)
 }
 
+// getBaseURL extracts the base URL from the request
+func getBaseURL(r *http.Request) string {
+	scheme := "http"
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	}
+	return fmt.Sprintf("%s://%s", scheme, r.Host)
+}
+
 // AuthCallback handles the OAuth callback from Supabase
 func (h *AuthHandler) authCallback(w http.ResponseWriter, r *http.Request) {
-	// Check for redirect_to parameter from the original request
+	// Check for redirect_to parameter from the callback URL
 	redirectTo := r.URL.Query().Get("redirect_to")
 	if redirectTo == "" {
 		redirectTo = h.ClientURL
 	}
 	fmt.Println("Callback redirect_to:", redirectTo)
 
-	// Extract tokens from URL fragments (Supabase returns them in the URL)
-	accessToken := r.URL.Query().Get("access_token")
-	refreshToken := r.URL.Query().Get("refresh_token")
-	errorCode := r.URL.Query().Get("error")
-	errorDescription := r.URL.Query().Get("error_description")
-
-	if errorCode != "" {
-		http.Error(w, fmt.Sprintf("Auth error: %s - %s", errorCode, errorDescription), http.StatusBadRequest)
-		return
-	}
-
-	if accessToken == "" {
-		// If tokens aren't in query params, they might be in URL fragment
-		// Return HTML that extracts tokens from fragment and makes a POST request
-		html := fmt.Sprintf(`
+	// Supabase returns tokens in URL fragments, so we need JavaScript to extract them
+	html := fmt.Sprintf(`
 <!DOCTYPE html>
 <html>
 <head><title>Authentication</title></head>
 <body>
 <script>
+console.log('Full URL:', window.location.href);
+console.log('Hash:', window.location.hash);
+console.log('Search:', window.location.search);
+
 const params = new URLSearchParams(window.location.hash.substring(1));
 const accessToken = params.get('access_token');
 const refreshToken = params.get('refresh_token');
 const error = params.get('error');
+const errorDescription = params.get('error_description');
 
-// Also check for redirect_to in the URL
-const urlParams = new URLSearchParams(window.location.search);
-const redirectTo = urlParams.get('redirect_to') || '%s';
+const redirectTo = '%s';
+
+console.log('Access Token:', accessToken ? 'Found' : 'Not found');
+console.log('Redirect To:', redirectTo);
 
 if (error) {
-    document.body.innerHTML = '<h1>Authentication Error</h1><p>' + error + '</p>';
+    document.body.innerHTML = '<h1>Authentication Error</h1><p>' + error + ': ' + errorDescription + '</p>';
 } else if (accessToken) {
+    document.body.innerHTML = '<h1>Authentication Successful</h1><p>Processing...</p>';
+    
     // Send tokens to backend
     fetch('/v1/auth/callback', {
         method: 'POST',
@@ -122,53 +133,59 @@ if (error) {
             redirect_to: redirectTo
         })
     }).then(response => {
+        console.log('Backend response:', response.status);
         if (response.ok) {
+            document.body.innerHTML = '<h1>Redirecting...</h1><p>Taking you to the app...</p>';
             // Redirect to the original redirect_to URL
-            window.location.href = redirectTo;
+            setTimeout(() => {
+                window.location.href = redirectTo;
+            }, 1000);
         } else {
-            document.body.innerHTML = '<h1>Error</h1><p>Failed to authenticate</p>';
+            document.body.innerHTML = '<h1>Error</h1><p>Failed to authenticate with backend</p>';
         }
+    }).catch(err => {
+        console.error('Fetch error:', err);
+        document.body.innerHTML = '<h1>Error</h1><p>Network error: ' + err.message + '</p>';
     });
 } else {
-    document.body.innerHTML = '<h1>Authentication</h1><p>Processing...</p>';
+    document.body.innerHTML = '<h1>Authentication</h1><p>No access token found. Please try again.</p>';
+    console.log('No access token found in URL fragments');
 }
 </script>
 </body>
 </html>`, redirectTo)
 
-		w.Header().Set("Content-Type", "text/html")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(html))
+	w.Header().Set("Content-Type", "text/html")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(html))
+}
+
+// authCallbackPost handles the POST request from the JavaScript callback
+func (h *AuthHandler) authCallbackPost(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
+		RedirectTo   string `json:"redirect_to"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
 
-	// Handle POST request with tokens
-	if r.Method == "POST" {
-		var req struct {
-			AccessToken  string `json:"access_token"`
-			RefreshToken string `json:"refresh_token"`
-			RedirectTo   string `json:"redirect_to"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid request", http.StatusBadRequest)
-			return
-		}
-		accessToken = req.AccessToken
-		refreshToken = req.RefreshToken
-		if req.RedirectTo != "" {
-			redirectTo = req.RedirectTo
-		}
-	}
+	fmt.Println("POST callback - RedirectTo:", req.RedirectTo)
 
 	// Get user info from Supabase
-	user, err := h.getUserFromSupabase(accessToken)
+	user, err := h.getUserFromSupabase(req.AccessToken)
 	if err != nil {
+		fmt.Println("Error getting user from Supabase:", err)
 		http.Error(w, "Failed to get user info", http.StatusInternalServerError)
 		return
 	}
 
 	// Upsert user in our database
 	if err := h.Store.UpsertUser(r.Context(), user); err != nil {
+		fmt.Println("Error upserting user:", err)
 		http.Error(w, "Failed to save user", http.StatusInternalServerError)
 		return
 	}
@@ -176,7 +193,7 @@ if (error) {
 	// Set secure cookies with tokens
 	http.SetCookie(w, &http.Cookie{
 		Name:     "access_token",
-		Value:    accessToken,
+		Value:    req.AccessToken,
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
@@ -186,7 +203,7 @@ if (error) {
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
-		Value:    refreshToken,
+		Value:    req.RefreshToken,
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
@@ -194,16 +211,11 @@ if (error) {
 		Path:     "/",
 	})
 
-	if r.Method == "POST" {
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": true,
-			"user":    user,
-		})
-	} else {
-		fmt.Println("Final redirect to:", redirectTo)
-		http.Redirect(w, r, redirectTo, http.StatusTemporaryRedirect)
-	}
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"user":    user,
+	})
 }
 
 // Logout clears authentication cookies
