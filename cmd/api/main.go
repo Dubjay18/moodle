@@ -25,10 +25,13 @@ import (
 type Config struct {
 	Port                 string `envconfig:"PORT" default:"8080"`
 	DatabaseURL          string `envconfig:"DATABASE_URL" required:"true"`
+	SupabaseURL          string `envconfig:"SUPABASE_URL" required:"true"`
+	SupabaseAnonKey      string `envconfig:"SUPABASE_ANON_KEY" required:"true"`
 	SupabaseJWTPublicKey string `envconfig:"SUPABASE_JWT_PUBLIC_KEY"`
 	SupabaseJWKSURL      string `envconfig:"SUPABASE_JWKS_URL"`
 	SupabaseJWTAudience  string `envconfig:"SUPABASE_JWT_AUDIENCE" default:"authenticated"`
 	SupabaseJWTIssuer    string `envconfig:"SUPABASE_JWT_ISSUER" required:"true"`
+	ClientURL            string `envconfig:"CLIENT_URL" default:"http://localhost:3000"`
 	TMDBAPIKey           string `envconfig:"TMDB_API_KEY" required:"true"`
 	TMDBBaseURL          string `envconfig:"TMDB_BASE_URL" default:"https://api.themoviedb.org/3"`
 	GeminiAPIKey         string `envconfig:"GEMINI_API_KEY" required:"true"`
@@ -69,6 +72,7 @@ func main() {
 	wlHandler := handlers.NewWatchlistHandler(st, tmdbClient)
 	aiHandler := handlers.NewAIHandler(aiClient)
 	userHandler := handlers.NewUserHandler(st)
+	authHandler := handlers.NewAuthHandler(st, cfg.SupabaseURL, cfg.SupabaseAnonKey, cfg.ClientURL)
 
 	// Auth middleware
 	verifier := &auth.SupabaseVerifier{PublicKeyPEMOrJWKS: cfg.SupabaseJWTPublicKey, JWKSURL: cfg.SupabaseJWKSURL, Audience: cfg.SupabaseJWTAudience, Issuer: cfg.SupabaseJWTIssuer}
@@ -79,6 +83,8 @@ func main() {
 			r.Get("/search/movies", wlHandler.SearchMovies)
 			r.Get("/feed", wlHandler.Feed)
 			r.Post("/ai/ask", aiHandler.Ask)
+			// Auth routes (public)
+			r.Route("/auth", authHandler.Routes)
 		})
 		// Authed routes
 		r.Group(func(r chi.Router) {

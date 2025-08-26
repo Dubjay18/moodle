@@ -1,4 +1,9 @@
 bin/
+*.env
+.env.local
+.env.prod
+secrets.*
+secrets.env
 .env
 .env.prod
 **/*.local

@@ -92,12 +92,23 @@ func (v *SupabaseVerifier) keyFunc(token *jwt.Token) (interface{}, error) {
 
 func (v *SupabaseVerifier) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var tok string
+
+		// Try Authorization header first
 		authz := r.Header.Get("Authorization")
-		if !strings.HasPrefix(strings.ToLower(authz), "bearer ") {
+		if strings.HasPrefix(strings.ToLower(authz), "bearer ") {
+			tok = strings.TrimSpace(strings.TrimPrefix(authz, "Bearer "))
+		} else {
+			// Try cookie as fallback for browser requests
+			if cookie, err := r.Cookie("access_token"); err == nil {
+				tok = cookie.Value
+			}
+		}
+
+		if tok == "" {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
-		tok := strings.TrimSpace(strings.TrimPrefix(authz, "Bearer "))
 
 		parsed, err := jwt.Parse(tok, v.keyFunc, jwt.WithAudience(v.Audience), jwt.WithIssuer(v.Issuer))
 		if err != nil || !parsed.Valid {

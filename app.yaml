@@ -17,20 +17,28 @@ services:
   - key: DATABASE_URL
     type: secret
     value: "${db.DATABASE_URL}"
+  - key: SUPABASE_URL
+    type: secret
+    value: "${SUPABASE_URL}"
+  - key: SUPABASE_ANON_KEY
+    type: secret
+    value: "${SUPABASE_ANON_KEY}"
   - key: SUPABASE_JWKS_URL
     type: secret
-    value: "https://your-project.supabase.co/auth/v1/keys"
+    value: "${SUPABASE_JWKS_URL}"
   - key: SUPABASE_JWT_ISSUER
     type: secret
-    value: "https://your-project.supabase.co/auth/v1"
+    value: "${SUPABASE_JWT_ISSUER}"
   - key: SUPABASE_JWT_AUDIENCE
     value: "authenticated"
+  - key: CLIENT_URL
+    value: "${CLIENT_URL}"
   - key: TMDB_API_KEY
     type: secret
-    value: "your-tmdb-key"
+    value: "${TMDB_API_KEY}"
   - key: GEMINI_API_KEY
     type: secret
-    value: "your-gemini-key"
+    value: "${GEMINI_API_KEY}"
 
 databases:
 - name: db
