@@ -31,7 +31,7 @@ type Config struct {
 	SupabaseJWKSURL      string `envconfig:"SUPABASE_JWKS_URL"`
 	SupabaseJWTAudience  string `envconfig:"SUPABASE_JWT_AUDIENCE" default:"authenticated"`
 	SupabaseJWTIssuer    string `envconfig:"SUPABASE_JWT_ISSUER" required:"true"`
-	ClientURL            string `envconfig:"CLIENT_URL" default:"http://localhost:3000"`
+	ClientURL            string `envconfig:"CLIENT_URL" default:"exp://192.168.0.5:8081/--/auth"`
 	TMDBAPIKey           string `envconfig:"TMDB_API_KEY" required:"true"`
 	TMDBBaseURL          string `envconfig:"TMDB_BASE_URL" default:"https://api.themoviedb.org/3"`
 	GeminiAPIKey         string `envconfig:"GEMINI_API_KEY" required:"true"`
