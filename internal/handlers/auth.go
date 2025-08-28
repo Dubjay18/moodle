@@ -153,13 +153,10 @@ if (error) {
             response.json().then(data => {
                 document.body.innerHTML = '<h1>Redirecting...</h1><p>Taking you to the app...</p>';
                 
-                // For React Native deep links, include tokens in the URL
+                // For React Native deep links, pass the access token as 'token' parameter
+                // This matches what the React Native app expects: url.searchParams.get('token')
                 const redirectUrl = new URL(redirectTo);
-                redirectUrl.searchParams.set('access_token', accessToken);
-                if (refreshToken) {
-                    redirectUrl.searchParams.set('refresh_token', refreshToken);
-                }
-                redirectUrl.searchParams.set('user_id', data.user.id);
+                redirectUrl.searchParams.set('token', accessToken);
                 
                 console.log('Final redirect URL:', redirectUrl.toString());
                 
