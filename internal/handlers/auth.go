@@ -41,6 +41,7 @@ func (h *AuthHandler) Routes(r chi.Router) {
 // GoogleLogin initiates Google OAuth flow via Supabase
 func (h *AuthHandler) googleLogin(w http.ResponseWriter, r *http.Request) {
 	redirectTo := r.URL.Query().Get("redirect_to")
+	fmt.Println("=== GoogleLogin Debug ===")
 	fmt.Println("Raw redirect_to:", redirectTo)
 
 	// URL decode the redirect_to parameter
@@ -57,11 +58,14 @@ func (h *AuthHandler) googleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Println("Final redirect_to:", redirectTo)
+	fmt.Println("h.ClientURL:", h.ClientURL)
 
 	// Build callback URL with the original redirect_to as a parameter
 	callbackURL := fmt.Sprintf("%s/v1/auth/callback", getBaseURL(r))
 	// Always include redirect_to parameter to preserve the original destination
 	callbackURL += "?redirect_to=" + url.QueryEscape(redirectTo)
+
+	fmt.Println("Callback URL:", callbackURL)
 
 	// Build Supabase OAuth URL - redirect to OUR callback, not the final destination
 	authURL := fmt.Sprintf("%s/auth/v1/authorize", h.SupabaseURL)
@@ -72,6 +76,7 @@ func (h *AuthHandler) googleLogin(w http.ResponseWriter, r *http.Request) {
 
 	finalURL := authURL + "?" + params.Encode()
 	fmt.Println("Supabase OAuth URL:", finalURL)
+	fmt.Println("=== End Debug ===")
 
 	// Redirect to Supabase Google OAuth
 	http.Redirect(w, r, finalURL, http.StatusTemporaryRedirect)
@@ -90,11 +95,16 @@ func getBaseURL(r *http.Request) string {
 func (h *AuthHandler) authCallback(w http.ResponseWriter, r *http.Request) {
 	// Check for redirect_to parameter from the callback URL
 	redirectTo := r.URL.Query().Get("redirect_to")
+	fmt.Println("=== AuthCallback Debug ===")
+	fmt.Println("Query params:", r.URL.RawQuery)
+	fmt.Println("Callback redirect_to from query:", redirectTo)
+	
 	if redirectTo == "" {
 		redirectTo = h.ClientURL
+		fmt.Println("Using default h.ClientURL:", redirectTo)
 	}
-	fmt.Println("Callback redirect_to:", redirectTo)
-	fmt.Println("h.ClientURL:", h.ClientURL)
+	fmt.Println("Final callback redirect_to:", redirectTo)
+	fmt.Println("=== End Callback Debug ===")
 
 	// Supabase returns tokens in URL fragments, so we need JavaScript to extract them
 	html := fmt.Sprintf(`
