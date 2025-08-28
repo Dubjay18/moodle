@@ -36,7 +36,6 @@ func (h *AuthHandler) Routes(r chi.Router) {
 	r.Post("/callback", h.authCallbackPost)
 	r.Post("/logout", h.logout)
 	r.Get("/user", h.getUser)
-	r.Get("/debug/config", h.debugConfig) // Temporary debug endpoint
 }
 
 // GoogleLogin initiates Google OAuth flow via Supabase
@@ -313,14 +312,4 @@ func (h *AuthHandler) getUserFromSupabase(accessToken string) (*models.User, err
 	}
 
 	return user, nil
-}
-
-// debugConfig returns current configuration (temporary debug endpoint)
-func (h *AuthHandler) debugConfig(w http.ResponseWriter, r *http.Request) {
-	config := map[string]string{
-		"clientURL":     h.ClientURL,
-		"supabaseURL":   h.SupabaseURL,
-	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(config)
 }
