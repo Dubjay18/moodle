@@ -61,9 +61,8 @@ func (h *AuthHandler) googleLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Build callback URL with the original redirect_to as a parameter
 	callbackURL := fmt.Sprintf("%s/v1/auth/callback", getBaseURL(r))
-	if redirectTo != h.ClientURL {
-		callbackURL += "?redirect_to=" + url.QueryEscape(redirectTo)
-	}
+	// Always include redirect_to parameter to preserve the original destination
+	callbackURL += "?redirect_to=" + url.QueryEscape(redirectTo)
 
 	// Build Supabase OAuth URL - redirect to OUR callback, not the final destination
 	authURL := fmt.Sprintf("%s/auth/v1/authorize", h.SupabaseURL)
@@ -96,6 +95,7 @@ func (h *AuthHandler) authCallback(w http.ResponseWriter, r *http.Request) {
 		redirectTo = h.ClientURL
 	}
 	fmt.Println("Callback redirect_to:", redirectTo)
+	fmt.Println("h.ClientURL:", h.ClientURL)
 
 	// Supabase returns tokens in URL fragments, so we need JavaScript to extract them
 	html := fmt.Sprintf(`
