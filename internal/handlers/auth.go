@@ -98,7 +98,7 @@ func (h *AuthHandler) authCallback(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("=== AuthCallback Debug ===")
 	fmt.Println("Query params:", r.URL.RawQuery)
 	fmt.Println("Callback redirect_to from query:", redirectTo)
-	
+
 	if redirectTo == "" {
 		redirectTo = h.ClientURL
 		fmt.Println("Using default h.ClientURL:", redirectTo)
@@ -126,10 +126,14 @@ const errorDescription = params.get('error_description');
 const redirectTo = '%s';
 
 console.log('Access Token:', accessToken ? 'Found' : 'Not found');
+console.log('Refresh Token:', refreshToken ? 'Found' : 'Not found');
 console.log('Redirect To:', redirectTo);
+console.log('Error:', error);
+console.log('Error Description:', errorDescription);
 
 if (error) {
     document.body.innerHTML = '<h1>Authentication Error</h1><p>' + error + ': ' + errorDescription + '</p>';
+    console.error('OAuth Error:', error, errorDescription);
 } else if (accessToken) {
     document.body.innerHTML = '<h1>Authentication Successful</h1><p>Processing...</p>';
     
@@ -145,11 +149,28 @@ if (error) {
     }).then(response => {
         console.log('Backend response:', response.status);
         if (response.ok) {
-            document.body.innerHTML = '<h1>Redirecting...</h1><p>Taking you to the app...</p>';
-            // Redirect to the original redirect_to URL
-            setTimeout(() => {
-                window.location.href = redirectTo;
-            }, 1000);
+            // Parse the response to get user info
+            response.json().then(data => {
+                document.body.innerHTML = '<h1>Redirecting...</h1><p>Taking you to the app...</p>';
+                
+                // For React Native deep links, include tokens in the URL
+                const redirectUrl = new URL(redirectTo);
+                redirectUrl.searchParams.set('access_token', accessToken);
+                if (refreshToken) {
+                    redirectUrl.searchParams.set('refresh_token', refreshToken);
+                }
+                redirectUrl.searchParams.set('user_id', data.user.id);
+                
+                console.log('Final redirect URL:', redirectUrl.toString());
+                
+                // Redirect to the React Native app with tokens
+                setTimeout(() => {
+                    window.location.href = redirectUrl.toString();
+                }, 1000);
+            }).catch(err => {
+                console.error('JSON parse error:', err);
+                document.body.innerHTML = '<h1>Error</h1><p>Failed to parse response</p>';
+            });
         } else {
             document.body.innerHTML = '<h1>Error</h1><p>Failed to authenticate with backend</p>';
         }
@@ -223,8 +244,10 @@ func (h *AuthHandler) authCallbackPost(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"user":    user,
+		"success":       true,
+		"user":          user,
+		"access_token":  req.AccessToken,
+		"refresh_token": req.RefreshToken,
 	})
 }
 
