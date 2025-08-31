@@ -61,6 +61,31 @@ func (h *WatchlistHandler) SearchMovies(w http.ResponseWriter, r *http.Request) 
 	_ = json.NewEncoder(w).Encode(res)
 }
 
+// Public: GET /v1/movies/{id}
+// Fetch a single movie from TMDb by its numeric ID.
+func (h *WatchlistHandler) Movie(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	if idStr == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "id is required"})
+		return
+	}
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil || id <= 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "id must be a positive integer"})
+		return
+	}
+
+	mv, err := h.TMDB.GetMovie(r.Context(), id)
+	if err != nil {
+		w.WriteHeader(http.StatusBadGateway)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	_ = json.NewEncoder(w).Encode(mv)
+}
+
 // Public (or semi-public): /v1/trending?window=week|month&limit=20
 func (h *WatchlistHandler) Trending(w http.ResponseWriter, r *http.Request) {
 	type qT struct {

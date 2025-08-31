@@ -81,6 +81,7 @@ func main() {
 		// Public routes
 		r.Group(func(r chi.Router) {
 			r.Get("/search/movies", wlHandler.SearchMovies)
+			r.Get("/movies/{id}", wlHandler.Movie)
 			r.Get("/feed", wlHandler.Feed)
 			r.Post("/ai/ask", aiHandler.Ask)
 			// Auth routes (public)
