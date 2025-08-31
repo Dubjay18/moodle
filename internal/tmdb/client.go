@@ -16,11 +16,12 @@ type Client struct {
 }
 
 type Movie struct {
-	ID          int64  `json:"id"`
-	Title       string `json:"title"`
-	Overview    string `json:"overview"`
-	PosterPath  string `json:"poster_path"`
-	ReleaseDate string `json:"release_date"`
+	ID           int64  `json:"id"`
+	Title        string `json:"title"`
+	Overview     string `json:"overview"`
+	PosterPath   string `json:"poster_path"`
+	BackdropPath string `json:"backdrop_path"`
+	ReleaseDate  string `json:"release_date"`
 }
 
 type SearchMoviesResponse struct {
